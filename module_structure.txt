@@ -1,0 +1,49 @@
+# Structure of the sqlite_orm.py module
+
+#____________ Main data structures ____________
+
+class SQLiteDB
+	# DB structure API functions
+	 - struct_to_dict
+	 - struct_to_json
+
+	# table access API functions
+	 - table
+	 - tables
+
+	# basic table API functions
+	 - create_table
+	 - drop_table
+ 	 - modify_table - move to _Table class
+
+class _Table
+	# column access API functions
+	 - column
+	 - columns
+	 - column_pattern
+
+	# table export API function
+	 - to_csv
+
+	# basic column API functions
+	 - insert
+	 - update
+	 - update_many - move to _Column class
+
+class _Column
+	# values access API functions
+	 - values
+
+	# column export API function
+	 - to_csv
+
+	# basic values API functions
+	 - update
+
+# ___________ Basic API functions _____________
+ - create_connection
+ - execute_query
+ - execute_read_query
+
+
+	

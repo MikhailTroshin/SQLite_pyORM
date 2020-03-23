@@ -167,9 +167,13 @@ class SQLiteDB:
             
     
     # drop table - not ready
+    def drop_table(self, table_name):
+        pass
           
                  
-    # modify table - not ready   
+    # modify table - not ready
+    def modify_table(self, table_name, new_column_pattern):
+        pass
     
                    
 ################################################################################
@@ -239,7 +243,8 @@ class _Table:
         self._table_name = table_name
         self._column_pattern = {}
         self._column_pattern = column_pattern # dict
-        self._columns = []
+        self._columns = {} # dict of _Column class instances
+        self._column_names = []
         for key in column_pattern.keys():    
             self._columns.append(key)
 
@@ -249,9 +254,17 @@ class _Table:
 
 # _____________________ Column access _____________________
 
+    # return an instance of _Column class (if exists)      
+    def column(self, column_name):
+        if isinstance(self._columns[column_name], _Column):
+            return self._columns[column_name]
+        else:
+            print("There are no column with such a name")
+    
+
     # return a list of names of columns in required table        
     def columns(self):
-        return self._columns
+        return self._column_names
     
     
     # return column pattern of a table as a dict
@@ -432,7 +445,7 @@ class _Column:
 
 
 ################################################################################
-# Basic API function.
+# Basic API functions
 ################################################################################
       
 def create_connection(path):
@@ -611,36 +624,6 @@ holder['red'].checkme
  
 objs = list() for i in range(10): objs.append(MyClass()) 
 
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         
         
         
