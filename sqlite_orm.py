@@ -71,16 +71,17 @@ class SQLiteDB:
         
         
 ################################################################################
-# Basic API class functions
+# DB basic API functions
 ################################################################################
 
-    # execute a query for our DB object
+    # execute a query for our DB object   
     def execute_query(self, query):
         cursor = self._connection.cursor()
         try:
             cursor.execute(query)
             self._connection.commit()
-            print('Query executed successfully')
+            print('Query is executed successfully')
+            self._update_inner_info()
         except Error as e:
             print('The error "%s" occurred' %e)
     
@@ -94,8 +95,8 @@ class SQLiteDB:
             return result
         except Error as e:
             print('The error "%s" occurred' %e)
+        
             
-
 ################################################################################
 # API class functions
 ################################################################################            
@@ -108,7 +109,7 @@ class SQLiteDB:
         if isinstance(self._tables[table_name], _Table):
             return self._tables[table_name]
         else:
-            print("There are no table with such a name")
+            print("Specified database has no table with such a name!")
        
         
     # return a list of names of tables
@@ -117,7 +118,7 @@ class SQLiteDB:
         return self._table_names
 
 
-# ________________ DB structure exporting _______________         
+# ________________ DB structure export _______________         
             
     # export current db structure to dict
     def struct_to_dict(self):
@@ -160,7 +161,7 @@ class SQLiteDB:
             try:
                 cursor.execute(create_query)
                 self._connection.commit()
-                print(table_name + ' table executed successfully')
+                print(table_name + ' table is created successfully!')
             except Error as e:
                 print('The error "%s" occurred' %e)
             self._update_inner_info()
@@ -168,20 +169,27 @@ class SQLiteDB:
     
     # drop table - not ready
     def drop_table(self, table_name):
-        pass
+        if isinstance(self._tables[table_name], _Table):
+            cursor = self._connection.cursor()
+            _drop_query = "DROP TABLE IF EXISTS " + str(table_name) + ";"
+            try:
+                cursor.execute(_drop_query)
+                self._connection.commit()
+                print(table_name + ' table is droppped successfully!')
+                self._update_inner_info()
+            except Error as e:
+                print('The error "%s" occurred' %e)
+        else:
+            print("Specified database has no table with such a name!")
           
-                 
-    # modify table - not ready
-    def modify_table(self, table_name, new_column_pattern):
-        pass
-    
                    
 ################################################################################
 # Inner functions
 ################################################################################
     
-    # Make SQL request column config from dict column pattern      
-    def _make_pattern(self, col_dict):
+    # Make SQL request column config from dict column pattern
+    @staticmethod
+    def _make_pattern(col_dict):
         # example of output: 'id SERIAL PRIMARY KEY, login CHAR(64), password CHAR(64)'
         # example of input: {'id':'SERIAL PRIMARY KEY', 'login':'CHAR(64)', 'password':'CHAR(64)'}
         __columns_desc = ' '
@@ -197,7 +205,6 @@ class SQLiteDB:
 
     # Update configuration
     def _update_table_info(self):
-        stop_words = ['FOREIGN']
         db_info_query = "SELECT name FROM sqlite_master WHERE type = 'table';"  
         cursor = self._connection.cursor()
         cursor.execute(db_info_query)
@@ -207,27 +214,11 @@ class SQLiteDB:
         if self._table_names:
             # if the database already exists and isn't empty 
             # for each table read the structure and create an Table class instance
-            for table_name in self._table_names:
-                table_structure_query = "SELECT sql FROM sqlite_master WHERE name = '" + table_name + "';"
-                cursor = self._connection.cursor()
-                cursor.execute(table_structure_query)
-                table_struct_raw = cursor.fetchone()
-                # ('CREATE TABLE users(\nid INTEGER PRIMARY KEY AUTOINCREMENT,\nname TEXT NOT NULL,\nage INTEGER,\ngender TEXT,\nnationality TEXT)',)
-                list_of_columns = (re.sub('[\(\)]', '', re.search('\(.+\)', re.sub(r"\n", " ", table_struct_raw[0])).group(0))).split(',')
-                columns = {} # future column pattern
-                # for each column info parse the data and create the dict
-                for column_info in list_of_columns:
-                    column_name = re.findall(r'\w+', column_info)[0]
-                    #self.column_names.append(column_name)
-                    columns[column_name] = ' '.join(re.findall(r'\w+', column_info)[1:])
-                # Delete objects from column dict, if a key is in stop words list
-                for stop_word in stop_words:
-                    if stop_word in columns.keys():
-                        columns.pop(stop_word)
-                self._tables[table_name] = _Table(self._connection,table_name,columns)
+            for table_name in self._table_names: 
+                self._tables[table_name] = _Table(self._connection, table_name)
                 #self._tables.append(_Table(self._connection,table_name,columns))
-                time.sleep(0.5)
-            print('Configuration is updated successfully')
+                time.sleep(0.2)
+            print('Table configuration is updated successfully')
         else:
             print('Database is empty')
 
@@ -238,19 +229,19 @@ class SQLiteDB:
           
 class _Table:
     # class Table   
-    def __init__(self, connection, table_name, column_pattern):
+    def __init__(self, connection, table_name):
         self._connection = connection
         self._table_name = table_name
+        
         self._column_pattern = {}
-        self._column_pattern = column_pattern # dict
         self._columns = {} # dict of _Column class instances
-        self._column_names = []
-        for key in column_pattern.keys():    
-            self._columns.append(key)
+        self._column_names = [] # names of columns
+        self._update_column_info()
 
 ################################################################################
 # API class functions
 ################################################################################             
+
 
 # _____________________ Column access _____________________
 
@@ -259,7 +250,7 @@ class _Table:
         if isinstance(self._columns[column_name], _Column):
             return self._columns[column_name]
         else:
-            print("There are no column with such a name")
+            print("Specified table has no column with such a name!")
     
 
     # return a list of names of columns in required table        
@@ -293,29 +284,41 @@ class _Table:
             print('The error "%s" occurred' %e)
             
 
-# __________________ Basic  functions ____________________
-  
+# __________________ Basic functions ____________________
+
+    # rename table
+    def _rename(self, new_name):    
+        rename_query = "ALTER TABLE " + str(self._table_name) + " RENAME TO " + str(new_name) + ";"          
+        self._execute_query(self._connection, rename_query)
+        self._update_column_info()
+        
+        
+    # add a new column
+    def add_column(self, column_pattern):
+        add_query = "ALTER TABLE " + str(self._table_name) + " ADD COLUMN " + SQLiteDB._make_pattern(column_pattern) + ";"
+        self._execute_query(self._connection, add_query)
+        self._update_column_info()
+        
+
     # insert a new record
     def insert(self, record):
-        insert_query = "INSERT INTO %s VALUES " %self._table_name + _make_insert_values(record) + ";"
-        _execute_query(self._connection, insert_query)
-
-
-    # update one value
-    def update(self, column, condition, value):
-        update_query = "UPDATE %s SET "%self._table_name
-                                        str(column) +
-                                        " = " +
-                                        str(value) +
-                                        " WHERE " + str(condition))                  
-        _execute_query(self._connection, update_query)
-    
-    
-    # update many values
-    def update_many(self, columns, condition, values):
-        update_many_query = "UPDATE %s SET "%self._table_name + _make_many_insert_values(columns, condition, values)
-        _execute_query(self._connection, update_many_query)
+        """
         
+
+        Parameters
+        ----------
+        record : TYPE: one list (tuple) or list (tuple) of lists (tuples)
+            DESCRIPTION.
+
+        Returns 
+        
+        -------
+        None.
+
+        """
+        insert_query = "INSERT INTO %s VALUES " %self._table_name + self._make_insert_values(record) + ";"
+        self._execute_query(self._connection, insert_query)
+
 
 ################################################################################
 # Inner functions
@@ -324,38 +327,28 @@ class _Table:
     # Update column configuration - do not ready !!!!!!!!!!!!!!!!! 
     def _update_column_info(self):
         stop_words = ['FOREIGN']
-        db_info_query = "SELECT name FROM sqlite_master WHERE type = 'table';"  
+        table_structure_query = "SELECT sql FROM sqlite_master WHERE name = '" + self.table_name + "';"
         cursor = self._connection.cursor()
-        cursor.execute(db_info_query)
-        table_tuples = cursor.fetchall()
-        # [('users',), ('sqlite_sequence',), ('posts',), ('comments',), ('likes',)]
-        self._table_names = [table_tuple[0] for table_tuple in table_tuples if table_tuple[0] != 'sqlite_sequence']
-        if self._table_names:
-            # if the database already exists and isn't empty 
-            # for each table read the structure and create an Table class instance
-            for table_name in self._table_names:
-                table_structure_query = "SELECT sql FROM sqlite_master WHERE name = '" + table_name + "';"
-                cursor = self._connection.cursor()
-                cursor.execute(table_structure_query)
-                table_struct_raw = cursor.fetchone()
-                # ('CREATE TABLE users(\nid INTEGER PRIMARY KEY AUTOINCREMENT,\nname TEXT NOT NULL,\nage INTEGER,\ngender TEXT,\nnationality TEXT)',)
-                list_of_columns = (re.sub('[\(\)]', '', re.search('\(.+\)', re.sub(r"\n", " ", table_struct_raw[0])).group(0))).split(',')
-                columns = {} # future column pattern
-                # for each column info parse the data and create the dict
-                for column_info in list_of_columns:
-                    column_name = re.findall(r'\w+', column_info)[0]
-                    #self.column_names.append(column_name)
-                    columns[column_name] = ' '.join(re.findall(r'\w+', column_info)[1:])
-                # Delete objects from column dict, if a key is in stop words list
-                for stop_word in stop_words:
-                    if stop_word in columns.keys():
-                        columns.pop(stop_word)
-                self._tables[table_name] = _Table(self._connection,table_name,columns)
-                #self._tables.append(_Table(self._connection,table_name,columns))
-                time.sleep(0.5)
-            print('Configuration is updated successfully')
-        else:
-            print('Database is empty')
+        cursor.execute(table_structure_query)
+        table_struct_raw = cursor.fetchone()
+        # ('CREATE TABLE users(\nid INTEGER PRIMARY KEY AUTOINCREMENT,\nname TEXT NOT NULL,\nage INTEGER,\ngender TEXT,\nnationality TEXT)',)
+        list_of_columns = (re.sub('[\(\)]', '', re.search('\(.+\)', re.sub(r"\n", " ", table_struct_raw[0])).group(0))).split(',')
+        # for each column info parse the data and create the dict
+        for column_info in list_of_columns:
+            column_name = re.findall(r'\w+', column_info)[0]
+            # make a pattern
+            self._column_pattern[column_name] = ' '.join(re.findall(r'\w+', column_info)[1:])
+            # Delete objects from column dict, if a key is in stop words list
+            for stop_word in stop_words:
+                if stop_word in self._column_pattern.keys():
+                    self._column_pattern.pop(stop_word)
+            # Create _Column instances
+            self._columns[column_name] = _Column(self._connection, self._table_name, column_name)
+            time.sleep(0.2)
+        for key in self._column_pattern.keys():    
+            self._column_names.append(key)
+        print('Column configuration is updated successfully')
+        
 
 ################################################################################
 # Static class functions
@@ -406,7 +399,7 @@ class _Table:
         else:
             raise ValueError("Different number of columns and values!")
             
-        
+
     # execute a query
     @staticmethod
     def _execute_query(connection, query):
@@ -414,7 +407,7 @@ class _Table:
         try:
             cursor.execute(query)
             connection.commit()
-            print('Query executed successfully')
+            print('Query is executed successfully')
         except Error as e:
             print('The error "%s" occurred' %e)
      
@@ -437,11 +430,70 @@ class _Table:
 ################################################################################ 
 
 class _Column:
-    def __init__(self, connection, column_name, column_pattern):
+    # class _Column
+    def __init__(self, connection, table_name, column_name):
         self._connection = connection
         self._column_name = column_name
-        self._column_pattern = column_pattern
+        self._table_name = table_name
+        self._values = []
+        self._read_values()
         
+################################################################################
+# API class functions
+################################################################################
+        
+# _____________________ Values access ____________________
+    
+    # return a list of values
+    def values(self):
+        return self._values
+    
+    
+    # Column export API function - not ready
+    def to_csv(self, **kwargs):
+        pass
+    
+# __________________ Basic functions ____________________
+        
+    # update one value
+    def update(self, condition, value):
+        update_query = "UPDATE %s SET "%self._table_name +
+                                        self._column_name +
+                                        " = " +
+                                        str(value) +
+                                        " WHERE " + str(condition))                  
+        self._execute_query(self._connection, update_query)
+    
+    
+    # update many values
+    def update_many(self, columns, condition, values):
+        update_many_query = "UPDATE %s SET "%self._table_name + _make_many_insert_values(columns, condition, values)
+        _execute_query(self._connection, update_many_query)
+        
+        
+################################################################################
+# Inner functions
+################################################################################
+        
+    # read values from column
+    def 
+  
+    
+################################################################################
+# Static class functions
+################################################################################
+
+    # execute a query
+    @staticmethod
+    def _execute_query(connection, query):
+        cursor = connection.cursor()
+        try:
+            cursor.execute(query)
+            connection.commit()
+            print('Query is executed successfully')
+        except Error as e:
+            print('The error "%s" occurred' %e)
+
 
 
 ################################################################################
@@ -462,7 +514,7 @@ def execute_query(connection, query):
     try:
         cursor.execute(query)
         connection.commit()
-        print('Query executed successfully')
+        print('Query is executed successfully')
     except Error as e:
         print('The error "%s" occurred' %e)
  

@@ -3,42 +3,46 @@
 #____________ Main data structures ____________
 
 class SQLiteDB
+	# DB basic API functions
+	 - execute_query + 
+	 - execute_read_query + 
+
 	# DB structure API functions
-	 - struct_to_dict
-	 - struct_to_json
+	 - struct_to_dict +
+	 - struct_to_json +
 
-	# table access API functions
-	 - table
-	 - tables
+	# Table access API functions
+	 - table +
+	 - tables +
 
-	# basic table API functions
-	 - create_table
-	 - drop_table
- 	 - modify_table - move to _Table class
+	# DB API functions
+	 - create_table +
+	 - drop_table + 
 
 class _Table
-	# column access API functions
-	 - column
-	 - columns
-	 - column_pattern
+	# Column access API functions
+	 - column +
+	 - columns +
+	 - column_pattern +
 
-	# table export API function
-	 - to_csv
+	# Table export API function
+	 - to_csv +
 
-	# basic column API functions
+	# Table API functions
+	 - rename
+	 - add_column
 	 - insert
-	 - update
-	 - update_many - move to _Column class
 
 class _Column
-	# values access API functions
-	 - values
+	# Values access API functions
+	 - values +
 
-	# column export API function
-	 - to_csv
+	# Column export API function
+	 - to_csv -
 
-	# basic values API functions
+	# Column API functions
 	 - update
+	 - update_many
 
 # ___________ Basic API functions _____________
  - create_connection
